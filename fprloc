@@ -1,0 +1,41 @@
+#!/bin/bash
+# Uses unzip, xmllint, xml (xmlstarlet), wc (wordcount)
+
+if [[ $# -ne 1 ]]; then
+    echo "One argument required for fpr file name."
+    exit 1
+fi
+
+if [ ! -f "$1" ]; then
+    echo "File $1 does not exist."
+    exit 1
+fi
+
+WORK_DIR=`mktemp -d -p .`
+
+# check if tmp dir was created
+if [[ ! "$WORK_DIR" || ! -d "$WORK_DIR" ]]; then
+  echo "Could not create temp dir"
+  exit 1
+fi
+
+# deletes the temp directory
+function cleanup {      
+  rm -rf "$WORK_DIR"
+}
+
+# register the cleanup function to be called on the EXIT signal
+trap cleanup EXIT
+
+unzip -qq $1 "src-archive/*" -d $WORK_DIR
+
+INDEX=$WORK_DIR/src-archive/index.xml
+xmllint --dropdtd -o $INDEX $INDEX
+FILECOUNT=$(xml sel -t -v "count(//entry)" "$INDEX")
+
+for ((i=1; i<=FILECOUNT; i++)); do
+    NAME=$(xml sel -t -v "//entry[$i]/@key" "$INDEX")
+	FILE=$(xml sel -t -v "//entry[$i]/text()" "$INDEX")
+	WC=$(wc -l <$WORK_DIR/$FILE)
+	echo $NAME $WC
+done	
